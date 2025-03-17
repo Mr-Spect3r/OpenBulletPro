@@ -12,6 +12,7 @@ git clone https://github.com/Mr-Spect3r/OpenBulletPro
 cd OpenBulletPro
 python OpenBulletPro.py
 ```
+Join My Channel: <a href="https://t.me/esfelorm">Telegram
 
 # support
 
