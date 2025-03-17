@@ -105,3 +105,9 @@ python OpenBulletPro.py
   - [x] HTTPS
   - [x] SOCKS4
   - [x] SCOKS5
+
+# Proof
+
+<img src="https://github.com/user-attachments/assets/ac7865cb-bd5e-496a-b854-81eba68c3dea">
+
+<img src="https://github.com/user-attachments/assets/e5d62989-28d8-4116-b93b-002a053c5442">
