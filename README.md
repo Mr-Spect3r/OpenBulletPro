@@ -14,23 +14,40 @@ python OpenBulletPro.py
 ```
 
 ## Simple mode
+
+```
 python openbullet.py --config test.loli --combos combos.txt
+```
 
 ## With proxy
+
+```
 python openbullet.py --config config.anom --combos list.txt --proxies proxies.txt --proxy-type socks5
+```
 
 ## Parallel mode
+
+```
 python openbullet.py --config test.loli --combos data.txt --proxies socks.txt --parallel --workers 10
+```
 
 ## Without proxy
+
+```
 python openbullet.py --config config.loli --combos users.txt --no-proxy
+```
 
 ## With delay and custom output
+
+```
 python openbullet.py --config test.anom --combos combos.txt --proxies http.txt --delay 1 --output ./results
+```
 
 ## Silent mode
-python openbullet.py --config config.loli --combos data.txt --silent
 
+```
+python openbullet.py --config config.loli --combos data.txt --silent
+```
 
 Join My Channel: <a href="https://t.me/Specter_OG">Telegram
 
