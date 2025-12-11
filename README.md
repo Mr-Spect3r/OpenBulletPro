@@ -1,6 +1,6 @@
 ## OpenBullet
 
-<img src="https://github.com/user-attachments/assets/0c671293-3a5d-4f08-9164-bbcdca165fc7">
+<img src="https://github.com/user-attachments/assets/9b91da4d-d283-4e79-aa7a-658cdbcf2002">
 
 <b>Run any configuration for OpenBullet in Linux/Termox/Windows with this tool!</b>
 
@@ -13,6 +13,8 @@ cd OpenBulletPro
 python OpenBulletPro.py
 ```
 Join My Channel: <a href="https://t.me/MrEsfelurm">Telegram
+
+<img src="https://github.com/user-attachments/assets/44766006-92da-465c-bc11-342d48556696">
 
 # support
 
