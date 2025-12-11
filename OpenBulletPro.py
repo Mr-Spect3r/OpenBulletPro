@@ -1,13 +1,13 @@
 try:
+
     from enum import Enum
     import re,json,base64
     from jsonpath_ng import parse as JTParse
     from bs4 import BeautifulSoup
     from shutil import copyfile, move, rmtree
-    from random import choice, shuffle
+    from random import choice, shuffle,randint
     from urllib.parse import quote, unquote
     from datetime import datetime,timezone
-    from random import randint
     import random
     import time
     import math
@@ -16,24 +16,32 @@ try:
     from hashlib import pbkdf2_hmac
     import hmac
     from secrets import token_bytes
+    import requests
+    from requests.cookies import RequestsCookieJar
     from requests import Request, Session
     from requests.auth import HTTPBasicAuth
     from requests.utils import quote
-    import random
+    import warnings
     from math import floor
     from typing import Union
     import os
     import argparse
+    import urllib3
+    from functools import lru_cache
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    import threading
+    from colorama import init
+
 except Exception as F:
-	exit(f"Module Error {F}\n\nTo install the module, enter the following command: pip install {F}")
+    exit(f"Module Error {F}\n\nTo install the module, enter the following command: pip install {F}")
+
 rd, gn, lgn, yw, lrd, be, pe = '\033[00;31m', '\033[00;32m', '\033[01;32m', '\033[01;33m', '\033[01;31m', '\033[00;34m', '\033[01;35m'
 cn, k,g = '\033[00;36m', '\033[90m','\033[38;5;130m'
+
 def clear():
-    if 'Windows' in __import__("platform").uname():
-        os.system("cls")
-    else:
-    	os.system("clear")	
-	
+    os.system('cls || clear')	
+
+init()
 	
 class TF:
     SUCCESS = '\033[01;32mSUCCESS '
@@ -44,16 +52,28 @@ class TF:
     RETRY = '\033[01;33mRETRY '
     CUSTOM = '\033[00;36mCUSTOM '
 
+COMPARER_FUNCTIONS = {
+    "EqualTo": lambda L, R: any(str(l) == str(R) for l in L),
+    "NotEqualTo": lambda L, R: any(str(l) != str(R) for l in L),
+    "GreaterThan": lambda L, R: any(float(str(l).replace(",", ".")) > float(str(R).replace(",", ".")) for l in L),
+    "LessThan": lambda L, R: any(float(str(l).replace(",", ".")) < float(str(R).replace(",", ".")) for l in L),
+    "Contains": lambda L, R: any(str(R) in str(l) for l in L),
+    "DoesNotContain": lambda L, R: all(str(R) not in str(l) for l in L),
+    "Exists": lambda L, R: len(L) > 0 and any(str(l) != "" for l in L),
+    "DoesNotExist": lambda L, R: len(L) == 0 or all(str(l) == "" for l in L),
+    "MatchesRegex": lambda L, R: any(re.search(str(R), str(l)) for l in L),
+    "DoesNotMatchRegex": lambda L, R: all(not re.search(str(R), str(l)) for l in L),
+}
+
+@lru_cache(maxsize=128)
+def get_compiled_regex(pattern):
+    return re.compile(pattern)
+
 def ToSleep(text,Time):
     for char in text:
         print(char, end='', flush=True)
         time.sleep(Time)
 
-
-class VARLB:
-    Single = "Single"
-    List = "List"
-    Dictionary = "Dictionary"
 class CVV:
     def __init__(self, Name:str, Value,IsCapture:bool,Hidden=False):
 
@@ -106,7 +126,7 @@ class CVV:
         else:
             print("Value not in dictionary")
             return None
-        
+
 class VariableList:
     def __init__(self):
         self.all = []
@@ -145,111 +165,10 @@ class VariableList:
     def ToCaptureString(self):
         return " | ".join([v.Name + "=" + v.ToString() for v in self.Captures()]) 
     
-class proxyType(str,Enum):
-    HTTP = "http"
-    HTTPS = "https"
-    SOCKS4 = "socks4"
-    SOCKS5 = "socks5"
-class BotData:
-    class BotStatus(str,Enum):
-        NONE = "NONE"
-        ERROR = "ERROR"
-        SUCCESS = "SUCCESS"
-        FAIL = "FAIL"
-        BAN = "BAN"
-        RETRY = "RETRY"
-        CUSTOM = "CUSTOM"
-    def __init__(self,status=BotStatus.NONE, proxy:dict = None):
-        self.Variables = VariableList()
-        self.status = status
-        self.cwd = None
-        self.proxy = proxy
-
-    def ResponseSourceGet(self):
-        return self.Variables.GetWithName("SOURCE").Value
-    def ResponseSourceSet(self,variable):
-        self.Variables.Set(variable)
-
-    def AddressGet(self):
-        return self.Variables.GetWithName("ADDRESS").Value
-    def AddressSet(self,variable):
-        self.Variables.Set(variable)
-
-    def ResponseCodeGet(self):
-        return self.Variables.GetWithName("RESPONSECODE").Value
-    def ResponseCodeSet(self,variable):
-        self.Variables.Set(variable)
-
-    def ResponseHeadersGet(self):
-        return self.Variables.GetWithName("HEADERS").Value
-    def ResponseHeadersSet(self,variable):
-        self.Variables.Set(variable)
-
-    def CookiesGet(self):
-        return self.Variables.GetWithName("COOKIES")
-    def CookiesSet(self,variable):
-        self.Variables.Set(variable)
-
-
-
-
 class VARLB:
     Single = "Single"
     List = "List"
     Dictionary = "Dictionary"
-class CVV:
-
-    def __init__(self, Name:str, Value,IsCapture:bool,Hidden=False):
-
-        if type(Value) == list:
-            self.var_type = VARLB.List
-        elif type(Value) == str:
-            self.var_type = VARLB.Single
-        elif type(Value) == dict:
-            self.var_type = VARLB.Dictionary
-
-        self.Name = Name
-        self.Value = Value
-        self.IsCapture = IsCapture
-        self.Hidden = Hidden
-    
-    def ToString(self):
-        if self.var_type == VARLB.Single:
-            return self.Value
-        elif self.var_type == VARLB.List:
-            if type(self.Value == list): return "[" + ",".join(self.Value) + "]"
-            else: return ""
-        elif self.var_type == VARLB.Dictionary:
-            return "{" + ",".join(["(" + v[0] + ", " + v[1] + ")" for v in self.Value.items()]) + "}"
-    
-    def GetListItem(self,index):
-        if self.var_type != VARLB.List: return None
-
-        List = list(self.Value)
-
-        if index < 0:
-            index = len(List) + index    
-        
-        if index > len(List) - 1 or index < 0: return None
-        return List[index]
-
-    def GetDictValue(self,key):
-        Dict = self.Value
-        Dict = next((v for v in self.Value.items() if v[0] == key),None)
-        if Dict:
-            return Dict[1]
-        else:
-            print("Key not in dictionary")
-            return None
-
-    def GetDictKey(self,value):
-        Dict = self.Value
-        Dict = next((v for v in self.Value.items() if v[1] == value),None)
-        if Dict:
-            return Dict[0]
-        else:
-            print("Value not in dictionary")
-            return None
         
 
 class proxyType(str,Enum):
@@ -305,66 +224,79 @@ def ParseArguments(input_string, delimL, delimR):
         output.append(match)
     return output
 
-def ReplaceValues(input_string,BotData):
-    if input_string == None: return input_string
-    if "<" not in input_string and ">" not in input_string: return input_string
+def ReplaceValues(input_string, BotData):
+    if input_string is None: 
+        return input_string
+    if "<" not in input_string or ">" not in input_string: 
+        return input_string
 
-    previous = ""
     output = input_string
-    args = None
-    while "<" in output and ">" in output and output != previous:
+    max_iterations = 10  
+    iteration = 0
+    
+    while "<" in output and ">" in output and iteration < max_iterations:
+        iteration += 1
         previous = output
-        r = re.compile('<([^<>]*)>')
-        full = ""
-        m = ""
+
+        r = get_compiled_regex('<([^<>]*)>')
         matches = r.findall(output)
-
+        
+        if not matches:
+            break
+            
         for match in matches:
-
             full = "<" + match + ">"
 
-            m = match
-
-            r = re.compile('^[^\\[\\{\\(]*')
-            name = r.search(m).group(0)
-            
-
+            name_match = re.search('^[^\[\{\(]*', match)
+            if not name_match:
+                continue
+                
+            name = name_match.group(0)
             v = BotData.Variables.GetWithName(name)
-
-            if not v: return output
-
-            args = m.replace(name,"")
+            
+            if not v:
+                continue
+                
+            args = match.replace(name, "")
             
             if v.var_type == VARLB.Single:
-                output = output.replace(full, v.Value)
-
+                output = output.replace(full, str(v.Value))
+                
             elif v.var_type == VARLB.List:
                 if not args: 
-                    output = output.replace(full,v.ToString())
-
+                    output = output.replace(full, v.ToString())
                 elif "[" in args and "]" in args:
-                    index = 0
                     try:
-                        index = int(ParseArguments(args, "[", "]")[0])
+                        index = int(re.search(r'\[(\d+)\]', args).group(1))
                         item = v.GetListItem(index)
-                        if item:
-                            output = output.replace(full,item)
-                    except Exception:
+                        if item is not None:
+                            output = output.replace(full, str(item))
+                    except:
                         pass
-
+                        
             elif v.var_type == VARLB.Dictionary:
-
                 if "(" in args and ")" in args:
-                    dicKey = ParseArguments(args, "(", ")")[0]
-                    output = output.replace(full, v.GetDictValue(dicKey))
-
+                    try:
+                        dicKey = re.search(r'\((.*?)\)', args).group(1)
+                        value = v.GetDictValue(dicKey)
+                        if value:
+                            output = output.replace(full, str(value))
+                    except:
+                        pass
                 elif "{" in args and "}" in args:
-                    dicVal = ParseArguments(args, "{", "}")[0]
-                    output = output.replace(full, v.GetDictKey(dicVal))
-
-                else: 
-                    output = output.replace(full,v.ToString())
+                    try:
+                        dicVal = re.search(r'\{(.*?)\}', args).group(1)
+                        key = v.GetDictKey(dicVal)
+                        if key:
+                            output = output.replace(full, str(key))
+                    except:
+                        pass
+                else:
+                    output = output.replace(full, v.ToString())
         
+        if output == previous:
+            break
+    
     return output
 
 
@@ -481,151 +413,68 @@ class Comparer(str,Enum):
     DoesNotMatchRegex = "DoesNotMatchRegex"
 
 
-def Verify(Left,comparer,Right):
-    L = Left
-    R = Right
-    if comparer == Comparer.EqualTo:
-        return any([l for l in L if l == R])
-    elif comparer == Comparer.EqualTo:
-        return any([l for l in L if l != R])
-    elif comparer == Comparer.GreaterThan:
-        return any([l for l in L if float(l.replace(",",".")) > float(R.replace(",","."))])
-    elif comparer == Comparer.LessThan.value:
-        return any([l for l in L if float(l.replace(",",".")) < float(R.replace(",","."))])
-    elif comparer == Comparer.Contains:
-        return any([l for l in L if R in l])
-    elif comparer == Comparer.DoesNotContain:
-        return any([l for l in L if R not in l])
-    elif comparer == Comparer.Exists.value:
-        return any([l for l in L if l != Left])
-    elif comparer == Comparer.DoesNotExist:
-        return any([l for l in L if l == Left])
-    elif comparer == Comparer.MatchesRegex:
-        return any([l for l in L if re.match(l,R)])
-    elif comparer == Comparer.DoesNotMatchRegex:
-        return any([l for l in L if not re.match(l,R)])
+class Comparer(str,Enum):
+    LessThan = "LessThan"
+    GreaterThan = "GreaterThan"
+    EqualTo = "EqualTo"
+    NotEqualTo = "NotEqualTo"
+    Contains = "Contains"
+    DoesNotContain = "DoesNotContain"
+    Exists = "Exists"
+    DoesNotExist = "DoesNotExist"
+    MatchesRegex = "MatchesRegex"
+    DoesNotMatchRegex = "DoesNotMatchRegex"
+
+def Verify(Left, comparer, Right):
+    # تبدیل Left به لیست اگر نیست
+    if not isinstance(Left, list):
+        L = [Left]
     else:
+        L = Left
+    
+    R = Right
+
+    if isinstance(comparer, Comparer):
+        comparer_name = comparer.value
+    else:
+        comparer_name = str(comparer)
+
+    func = COMPARER_FUNCTIONS.get(comparer_name)
+    if func is None:
+        print(f"Warning: Unknown comparer {comparer_name}")
+        return False
+    
+    try:
+        return func(L, R)
+    except Exception as e:
+        print(f"Error in Verify: {e}")
         return False
 
-def ReplaceAndVerify(Left,comparer,Right,BotData):
-    L = ReplaceValuesRecursive(Left,BotData)
-    R = ReplaceValues(Right,BotData)
+def ReplaceAndVerify(Left, comparer, Right, BotData):
 
-    if comparer == Comparer.EqualTo:
-        return any([l for l in L if l == R])
-    elif comparer == Comparer.EqualTo:
-        return any([l for l in L if l != R])
-    elif comparer == Comparer.GreaterThan:
-        return any([l for l in L if float(l.replace(",",".")) > float(R.replace(",","."))])
-    elif comparer == Comparer.LessThan.value:
-        return any([l for l in L if float(l.replace(",",".")) < float(R.replace(",","."))])
-    elif comparer == Comparer.Contains:
-        return any([l for l in L if R in l])
-    elif comparer == Comparer.DoesNotContain:
-        return any([l for l in L if R not in l])
-    elif comparer == Comparer.Exists.value:
-        return any([l for l in L if l != Left])
-    elif comparer == Comparer.DoesNotExist:
-        return any([l for l in L if l == Left])
-    elif comparer == Comparer.MatchesRegex:
-        return any([l for l in L if re.match(l,R)])
-    elif comparer == Comparer.DoesNotMatchRegex:
-        return any([l for l in L if not re.match(l,R)])
+    L_result = ReplaceValuesRecursive(Left, BotData)
+    R = ReplaceValues(Right, BotData)
+
+    if not isinstance(L_result, list):
+        L = [L_result]
     else:
-        pass
+        L = L_result
 
-class Key:
-    def __init__(self,LeftTerm="",Comparer="",RightTerm=""):
-        self.LeftTerm = LeftTerm
-        self.Comparer = Comparer
-        self.RightTerm = RightTerm
+    if isinstance(comparer, Comparer):
+        comparer_name = comparer.value
+    else:
+        comparer_name = str(comparer)
 
-    def CheckKey(self,BotData):
-        try:
-            return ReplaceAndVerify(self.LeftTerm,self.Comparer,self.RightTerm,BotData)
-        except Exception:
-            return False
-        
-
-
-
-class KeychainType(Enum):
-    Success = "Success"
-    Failure = "Failure"
-    Ban = "Ban"
-    Retry = "Retry"
-    Custom = "Custom"
-
-class KeychainMode(Enum):
-    OR = "OR"
-    AND = "AND"
-class KeyChain:
-    def __init__(self,Type=None,Mode=None,banOn4XX=None,banOnToCheck=None,Keys=None):
-        self.Type = KeychainType.Success
-        self.Mode = KeychainMode.AND
-        self.Keys = []
-
-    def CheckKeys(self,BotData):
-        if self.Mode == KeychainMode.OR:
-            for key in self.Keys:
-                if key.CheckKey(BotData):
-                    return True
-            return False
-        elif self.Mode == KeychainMode.AND:
-            for key in self.Keys:
-                if not key.CheckKey(BotData):
-                    return False
-            return True
-
-
-class VariableList:
-    def __init__(self):
-        self.all = []
-    def Captures(self):
-        return [v for v in self.all if v.IsCapture == True and v.Hidden == False]
-
-    def VariableList(self):
-        self.all = []
-
-    def VariableListWithList(self,List):
-        self.all = List
-
-    def GetWithName(self,name):
-        return next((v for v in self.all if v.Name == name),None)
-
-    def GetWithNameAndType(self,name,var_type):
-        return next((v for v in self.all if v.var_type == var_type and v.Name == name),None)
-        
-    def GetSingle(self,name):
-        return self.GetWithNameAndType(name,VARLB.Single).Value
+    func = COMPARER_FUNCTIONS.get(comparer_name)
+    if func is None:
+        print(f"Warning: Unknown comparer {comparer_name}")
+        return False
     
-    def GetList(self,name):
-        v = self.GetWithNameAndType(name,VARLB.List)
-        if v:
-            return v.Value
-        else:
-            return None
-        
-    def GetDictionary(self,name):
-        return self.GetWithNameAndType(name,VARLB.Dictionary)
-
-    def VariableExists(self,name):
-        return any([v for v in self.all if v.Name == name])
-
-    def VariableExistsWithType(self,name, var_type):
-        return any([v for v in self.all if v.Name == name and v.var_type == var_type])
-    
-    def Set(self,variable:CVV):
-        self.Remove(variable.Name)
-
-        self.all.append(variable)
-    def SetNew(self, variable):
-        if self.VariableExists(variable.Name) == False: self.Set(variable)
-    def Remove(self,name):
-        self.all = [v for v in self.all if v.Name != name]
-
-    def ToCaptureString(self):
-        return " | ".join([v.Name + "=" + v.ToString() for v in self.Captures()]) 
+    try:
+        return func(L, R)
+    except Exception as e:
+        print(f"Error in ReplaceAndVerify: {e}")
+        return False
 
 class Key:
     def __init__(self,LeftTerm="",Comparer="",RightTerm=""):
@@ -666,30 +515,46 @@ class KeyChain:
                 if not key.CheckKey(BotData):
                     return False
             return True
+
+class Key:
+    def __init__(self,LeftTerm="",Comparer="",RightTerm=""):
+        self.LeftTerm = LeftTerm
+        self.Comparer = Comparer
+        self.RightTerm = RightTerm
+
+    def CheckKey(self,BotData):
+        try:
+            return ReplaceAndVerify(self.LeftTerm,self.Comparer,self.RightTerm,BotData)
+        except Exception:
+            return False
         
+class KeychainType(Enum):
+    Success = "Success"
+    Failure = "Failure"
+    Ban = "Ban"
+    Retry = "Retry"
+    Custom = "Custom"
 
+class KeychainMode(Enum):
+    OR = "OR"
+    AND = "AND"
+class KeyChain:
+    def __init__(self,Type=None,Mode=None,banOn4XX=None,banOnToCheck=None,Keys=None):
+        self.Type = KeychainType.Success
+        self.Mode = KeychainMode.AND
+        self.Keys = []
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    def CheckKeys(self,BotData):
+        if self.Mode == KeychainMode.OR:
+            for key in self.Keys:
+                if key.CheckKey(BotData):
+                    return True
+            return False
+        elif self.Mode == KeychainMode.AND:
+            for key in self.Keys:
+                if not key.CheckKey(BotData):
+                    return False
+            return True
 
 import re
 
@@ -722,18 +587,14 @@ def ParseToken(line:LineParser,TokenType,essential,proceed):
             pass
     return token
 
-
 def ParseLabel(line:LineParser) -> str:
     return ParseToken(line,"Label",True,True)
-
 
 def ParseLiteral(line:LineParser) -> str:
     return ParseToken(line,"Literal",True,True)
 
-    
 def ParseEnum(line:LineParser) -> str:
     return ParseToken(line,"Parameter",True,True)
-
 
 def ParseInt(line:LineParser) -> int:
     try:
@@ -741,8 +602,6 @@ def ParseInt(line:LineParser) -> int:
     except Exception:
         print("Expected Integer value")
         return 0
-
-
 
 def Lookahead(line:LineParser):
     token = ParseToken(line,"Parameter",True,False)
@@ -758,7 +617,6 @@ def Lookahead(line:LineParser):
         return "Integer"
     else:
         return "Parameter"
-
 
 def SetBool(line:LineParser,object):
     name, value  = ParseToken(line,"Parameter",True,True).split("=")
@@ -780,7 +638,6 @@ def CheckIdentifier(line:LineParser, id_string):
     except Exception:
         return False
     
-
 def ParseArguments(input_string, delimL, delimR):
     output = []
     pattern = "\\" + delimL + "([^\\" + delimR + "]*)\\" + delimR
@@ -806,19 +663,12 @@ def ReplaceValues(input_string,BotData):
         for match in matches:
 
             full = "<" + match + ">"
-
             m = match
-
             r = re.compile('^[^\\[\\{\\(]*')
             name = r.search(m).group(0)
-            
-
             v = BotData.Variables.GetWithName(name)
-
             if not v: return output
-
-            args = m.replace(name,"")
-            
+            args = m.replace(name,"")           
             if v.var_type == VARLB.Single:
                 output = output.replace(full, v.Value)
 
@@ -851,7 +701,6 @@ def ReplaceValues(input_string,BotData):
         
     return output
 
-
 def ReplaceValuesRecursive(input_string,BotData):
 
 
@@ -860,16 +709,13 @@ def ReplaceValuesRecursive(input_string,BotData):
     matches = r.findall(input_string)
 
     variables = []
-
-
     for m in matches:
         name = m
 
         variable = BotData.Variables.GetWithName(name)
         if variable:
             if variable.var_type == VARLB.List: variables.append(variable)
-        
-            
+          
     def theEnd(toReplace,BotData):
         toReplace = [ReplaceValues(replace,BotData) for replace in toReplace]
         return toReplace
@@ -892,7 +738,6 @@ def ReplaceValuesRecursive(input_string,BotData):
             toReplace.append(replaced)
             i += 1
         return theEnd(toReplace,BotData)
-
 
     r = re.compile("<([^\\(]*)\\(\\*\\)>")
     match = r.match(input_string)
@@ -951,9 +796,6 @@ def InsertVariable(BotData,isCapture,recursive,values,variableName,prefix="" ,su
         BotData.Variables.Set(variable)
     return True
 
-
-
-
 def LR(input_string, left, right,recursive=False,useRegex=False):
     if not left and not right:
         return [input_string]
@@ -965,7 +807,6 @@ def LR(input_string, left, right,recursive=False,useRegex=False):
     pFrom = 0
     pFrom = 0 
     List = []
-
 
     if recursive:
         if useRegex:
@@ -1111,7 +952,6 @@ def CSS(input:str, selector:str, attribute:str, index:int = 0, recusive:bool = F
                 output.append(attributes.get(attribute))
         
     return output
-
 
 class ParseType(str, Enum):
     LR = "LR"
@@ -1261,7 +1101,6 @@ class BlockParse:
 
         InsertVariable(BotData, self.IsCapture, self.Recursive, List, self.VariableName, self.Prefix, self.Suffix, self.EncodeOutput, self.CreateEmpty)
 
-
 class EncodingType(str, Enum):
     HEX = "HEX"
     BIN = "BIN"
@@ -1321,8 +1160,6 @@ class Conversion():
 
         elif encoding_type == EncodingType.UNICODE:
             return input_bytes.decode(encoding='UTF-16',errors='replace')
-
-import os
 
 def IsSubPathOf(parent_path, child_path):
     parent_path = os.path.abspath(os.path.realpath(parent_path))
@@ -1412,6 +1249,8 @@ class BlockUtility:
         self.isCapture = False
         self.group = None
         self.VariableName = ""
+        self.block_type = "UTILITY"  
+        self.label = ""  
 
     def FromLS(self, line:LineParser) -> None:
         if str(line.current).startswith("!"):
@@ -1718,8 +1557,6 @@ class BlockUtility:
                         rmtree(folder)
                         print(f"Executed action {self.folder_action} on file {folder}")
 
-
-
 def ToBase64(inputString:str):
     inputBytes = inputString.encode('utf-8')
     base64_bytes = base64.b64encode(inputBytes)
@@ -1789,7 +1626,6 @@ class Crypto:
         h = hashlib.sha512()
         h.update(rawInput)
         return h.digest()
-
 
     def HMACMD5(rawInput,rawKey):
         return hmac.new(rawKey, rawInput, hashlib.md5).digest()
@@ -1893,8 +1729,8 @@ class UserAgent:
         return f"Opera/9.80 ({random_window_version()}); U) Presto/{presto} Version/{version}"
 
     def ChromeUserAgent():
-        major = randint(62, 70);
-        build = randint(2100, 3538);
+        major = randint(62, 70)
+        build = randint(2100, 3538)
         branchBuild = randint(0, 170)
         return f"Mozilla/5.0 ({random_window_version()}) AppleWebKit/537.36 (KHTML, like Gecko) " + f"Chrome/{major}.0.{build}.{branchBuild} Safari/537.36"
 
@@ -2433,7 +2269,6 @@ class BlockFunction:
         else:
             return signature.hex().upper()
 
-
 class BlockKeycheck:
     def __init__(self):
         self.Dict = {}
@@ -2525,7 +2360,6 @@ class BlockKeycheck:
 class MultipartContentType(str, Enum):
     String = "String"
     File = "File"
-
 
 class MultipartContent:
     def __init__(self, Name:str, Value:str, Type:MultipartContentType, ContentType:str = "") -> None:
@@ -2624,8 +2458,6 @@ class ResponseType(str, Enum):
     String = "String"
     File = "File"
     Base64String = "Base64String"
-
-
 
 class BlockRequest:
     def __init__(self,url=None):
@@ -2851,33 +2683,45 @@ def CompressedLines(config_text) -> list:
 
             i += 1
     return compressed
+
 def Parse(input_line):
     input_line = input_line.strip()
+    if not input_line:
+        return None
+    
     line = LineParser()
     line.current = input_line
 
     disabled = input_line.startswith("!")
-    if disabled: line.current[1:]
+    if disabled: 
+        line.current = line.current[1:].strip() 
 
-    label = ParseToken(line,"Label", False, True)
+    label = ParseToken(line, "Label", False, True)
     
-    identifier = ""
-    identifier = ParseToken(line,"Parameter", True, True)
+    identifier = ParseToken(line, "Parameter", True, True)
+    
+    block_class = BlockMappings2.get(identifier.upper()) 
+    
+    if block_class:
+        try:
+            block = block_class()
 
-    block = BlockMappings2.get(identifier)
-    if block:
-        block = block()
-        block.FromLS(line)
-        if block:
-            block.label = label
+            if hasattr(block, 'label'):
+                block.label = label
+            
             block.block_type = identifier
+
+            if hasattr(block, 'FromLS'):
+                block.FromLS(line)
+            
             return block
-        else:
-            return False
+        except Exception as e:
+            print(f"{TF.ERROR}Failed to create block {identifier}: {e}")
+            return None
     else:
+        print(f"{yw}Unknown block type: {identifier}{k}")
         return None
     
-
 def ConfigToText(filepath:str) -> Union[str, None]:
     with open(filepath, 'r', encoding='utf-8') as file:
         data = file.read()
@@ -2897,11 +2741,8 @@ def ConfigToText(filepath:str) -> Union[str, None]:
 
         return res
 
-
 class OpenBullet:
-
-        
-    def AddProxy(proxy:str, proxy_type:proxyType,hey=None) -> Union[dict, None]:
+    def AddProxy(proxy:str, proxy_type:proxyType, hey=None) -> Union[dict, None]:
         ip = None
         port = None
         username = None
@@ -2915,6 +2756,7 @@ class OpenBullet:
             
         except Exception:
             return None
+        
         proxy_uri = None
         if username and password:
             proxy_uri = username + ":" + password + "@" + ip + ":" + port
@@ -2938,107 +2780,351 @@ class OpenBullet:
             request_proxy["https"] = "socks5://" + proxy_uri
     
         return request_proxy
-    def __init__(self,config:str, data:BotData = None, USER:str = None, PASS:str = None, output_path:str = None,
-                proxy:Union[str, None] = None, proxy_type:Union[str, proxyType] = proxyType.HTTP) -> None:
+    
+    def __init__(self, config:str, data:BotData = None, USER:str = None, PASS:str = None, 
+                 output_path:str = None, proxy:Union[str, None] = None, 
+                 proxy_type:Union[str, proxyType] = proxyType.HTTP) -> None:
+        
         self.blocks = []
         self.config = config
+
         if not data:
             self.data = BotData()
         else:
-            self.data = data
+
+            self.data = BotData(status=data.status, proxy=data.proxy)
+            self.data.Variables = VariableList()
+
+            for var in data.Variables.all:
+                self.data.Variables.Set(CVV(var.Name, var.Value, var.IsCapture, var.Hidden))
+
+        self.data.status = BotData.BotStatus.NONE
+        self.data.Variables.Set(CVV("COOKIES", {}, False, True))
+        self.data.Variables.Set(CVV("SOURCE", "", False, True))
+        self.data.Variables.Set(CVV("RESPONSECODE", "0", False, True))
+        self.data.Variables.Set(CVV("ADDRESS", "", False, True))
+        self.data.Variables.Set(CVV("HEADERS", {}, False, True))
+
+        self.data.session = requests.Session()
+        self.data.session.verify = False 
+        self.data.session.cookies.clear()  
+    
+        original_set_cookie = RequestsCookieJar.set_cookie
+        
+        def safe_set_cookie(self, cookie, *args, **kwargs):
+
+            try:
+                self.clear(cookie.domain, cookie.path, cookie.name)
+            except:
+                pass
+            return original_set_cookie(self, cookie, *args, **kwargs)
+        self.data.session.cookies.set_cookie = lambda cookie, *args, **kwargs: safe_set_cookie(
+            self.data.session.cookies, cookie, *args, **kwargs
+        )
         
         if proxy:
             request_proxy = self.AddProxy(proxy, proxy_type)
             self.data.proxy = request_proxy
 
         if USER:
-            self.data.Variables.Set(CVV("USER",USER,False,True))
+            self.data.Variables.Set(CVV("USER", USER, False, True))
         if PASS:
-            self.data.Variables.Set(CVV("PASS",PASS,False,True))
+            self.data.Variables.Set(CVV("PASS", PASS, False, True))
         
         if output_path:
             self.data.cwd = output_path
         else:
             self.data.cwd = os.getcwd()
-
-
+    
     def parse(self):
         compressed = CompressedLines(self.config)
         for c in compressed:
             try:
                 block = Parse(c)
             except Exception as e:
-                print(e)
+                print(f"Parse error: {e}")
                 return
-            if block: self.blocks.append(block)
-
+            if block: 
+                self.blocks.append(block)
+    
     def process(self):
         for block in self.blocks:
-            if self.data.status.value == self.data.BotStatus.FAIL or self.data.status.value == self.data.BotStatus.BAN or self.data.status.value == self.data.BotStatus.ERROR:
+            if self.data.status.value in [self.data.BotStatus.FAIL.value, 
+                                         self.data.BotStatus.BAN.value, 
+                                         self.data.BotStatus.ERROR.value]:
                 return
+            
             try:
-                block.Process(self.data)
+                if hasattr(block, 'Process'):
+                    if hasattr(block, 'use_session'):
+                        block.Process(self.data, self.data.session)
+                    else:
+                        block.Process(self.data)
+                else:
+                    print(f"Block {block.block_type} has no Process method")
+                    
             except Exception as e:
-                print(e)
+                print(f"Process error in block {block.block_type if hasattr(block, 'block_type') else 'unknown'}: {e}")
+                self.data.status = BotData.BotStatus.ERROR
                 return 
-                
+    
     def run(self):
+        self.blocks = []  
+        self.data.session.cookies.clear()  
+        
         self.parse()
         if self.blocks:
             self.process()
             return self.status()
         else:
             print("No blocks to process")
+            return BotData.BotStatus.ERROR.value
+    
     def status(self):
-        return self.data.status.value
+        return self.data.status.value if self.data.status else BotData.BotStatus.NONE.value
+    
+    def cleanup(self):
+        if hasattr(self.data, 'session'):
+            self.data.session.close()
+            del self.data.session
+
+def print_result(status, user, password):
+    if 'SUCCESS' == status:
+        print(f"{TF.SUCCESS}=> {user}:{password}\033[1;37m")
+        with open('SUCCESS.txt','a') as suc:
+            suc.write(f"{user}:{password}\n")
+    elif 'BAN' == status:
+        print(f"{TF.BAN}=> {user}:{password}\033[1;37m")
+    elif 'FAIL' == status:
+        print(f"{TF.FAIL}=> {user}:{password}\033[1;37m")
+    elif 'NONE' == status:
+        print(f"{TF.NONE}=> {user}:{password}\033[1;37m")
+    elif 'ERROR' == status:
+        print(f"{TF.ERROR}=> {user}:{password}\033[1;37m")
+    elif 'RETRY' == status:
+        print(f"{TF.RETRY}=> {user}:{password}\033[1;37m")
+        with open('RETRY.txt','a') as ret:
+            ret.write(f"{user}:{password}\n")
+    elif 'CUSTOM' == status:
+        print(f"{TF.CUSTOM}=> {user}:{password}\033[1;37m")
+        with open('CUSTOM.txt','a') as cus:
+            cus.write(f"{user}:{password}\n")
+
+def save_result(status, user, password):
+    if status == 'SUCCESS':
+        with open('SUCCESS.txt','a') as f:
+            f.write(f"{user}:{password}\n")
+    elif status == 'RETRY':
+        with open('RETRY.txt','a') as f:
+            f.write(f"{user}:{password}\n")
+    elif status == 'CUSTOM':
+        with open('CUSTOM.txt','a') as f:
+            f.write(f"{user}:{password}\n")
+
+class ParallelProcessor:
+    def __init__(self, config_text, proxy_list, combo_list, proxy_type, max_workers=5):
+        self.config_text = config_text
+        self.proxy_list = proxy_list
+        self.combo_list = combo_list
+        self.proxy_type = proxy_type
+        self.max_workers = max_workers
+        self.lock = threading.Lock()
+        self.stats = {
+            'total': 0, 'success': 0, 'fail': 0, 'retry': 0,
+            'custom': 0, 'ban': 0, 'error': 0, 'none': 0
+        }
+
+        if proxy_list and len(proxy_list) == 1 and proxy_list[0] is None:
+            self.proxy_list = [""]  
+            self.proxy_type = None
+            print(f"{k}[Parallel] Running without proxies{k}")
+        elif not proxy_list:
+            self.proxy_list = [""]
+            self.proxy_type = None
+            print(f"{k}[Parallel] No proxies, using direct connection{k}")
+        
+     
+    def process_single(self, proxy, combo):
+
+        try:
+            UserPass = combo.strip().split(':')
+            if len(UserPass) < 2:
+                return None
+            requests.cookies.RequestsCookieJar.set_cookie = lambda self, cookie, *args, **kwargs: None
+            username = UserPass[0].strip()
+            password = UserPass[1].strip()
+            
+            if proxy and proxy.strip():  
+                proxy_to_use = proxy.strip()
+                proxy_type_to_use = self.proxy_type
+            else:
+                proxy_to_use = None  
+                proxy_type_to_use = None
+            
+            open_bullet = OpenBullet(
+                config=self.config_text, 
+                USER=username,
+                PASS=password,
+                proxy=proxy_to_use,  
+                proxy_type=proxy_type_to_use 
+            )
+            
+            status = open_bullet.run()
+
+            with self.lock:
+                self.stats['total'] += 1
+                if status == 'SUCCESS':
+                    self.stats['success'] += 1
+                elif status == 'FAIL':
+                    self.stats['fail'] += 1
+                elif status == 'RETRY':
+                    self.stats['retry'] += 1
+                elif status == 'CUSTOM':
+                    self.stats['custom'] += 1
+                elif status == 'BAN':
+                    self.stats['ban'] += 1
+                elif status == 'ERROR':
+                    self.stats['error'] += 1
+                elif status == 'NONE':
+                    self.stats['none'] += 1
+            
+            return {
+                'user': username,
+                'pass': password,
+                'status': status,
+                'proxy': proxy if proxy else 'DIRECT'
+            }
+        except Exception as e:
+            print(f"{TF.ERROR}Error processing {combo[:20]}...: {e}")
+            return None
+    def print_stats(self):
+        with self.lock:
+            total = self.stats['total']
+            if total == 0:
+                return
+            
+            print(f"\n{gn}{'='*50}")
+            print(f"📊 Parallel Processing Statistics")
+            print(f"{yw}{'='*50}")
+            print(f"{gn}✅ Success: {self.stats['success']} ({self.stats['success']/total*100:.1f}%)")
+            print(f"{rd}❌ Fail: {self.stats['fail']} ({self.stats['fail']/total*100:.1f}%)")
+            print(f"{be}🔄 Retry: {self.stats['retry']} ({self.stats['retry']/total*100:.1f}%)")
+            print(f"{cn}🎨 Custom: {self.stats['custom']} ({self.stats['custom']/total*100:.1f}%)")
+            print(f"{lrd}🚫 BAN: {self.stats['ban']} ({self.stats['ban']/total*100:.1f}%)")
+            print(f"{lrd}💥 Error: {self.stats['error']} ({self.stats['error']/total*100:.1f}%)")
+            print(f"{k}⚪ NONE: {self.stats['none']} ({self.stats['none']/total*100:.1f}%)")
+            print(f"{'-'*50}")
+            print(f"📈 Total Processed: {total}")
+            print(f"{yw}{'='*50}\033[1;37m")
+    
+    def run_parallel(self):
+
+        results = []
+        
+        print(f"{lgn}Starting parallel processing with {self.max_workers} workers...{k}")
+        start_time = time.time()
+        
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+
+            tasks = []
+            for proxy in self.proxy_list:
+                for combo in self.combo_list:
+                    tasks.append((proxy, combo))
+
+            if len(tasks) > 1000:
+                print(f"{yw}Limiting to first 1000 tasks for testing{k}")
+                tasks = tasks[:1000]
+            
+            future_to_task = {}
+            for proxy, combo in tasks:
+                future = executor.submit(self.process_single, proxy, combo)
+                future_to_task[future] = (proxy, combo)
+
+            completed = 0
+            for future in as_completed(future_to_task):
+                completed += 1
+                try:
+                    result = future.result(timeout=60)
+                    if result:
+                        results.append(result)
+
+                        status = result['status']
+                        user = result['user']
+                        password = result['pass']
+                        
+                        if status == 'SUCCESS':
+                            print(f"{TF.SUCCESS}=> {user}:{password}\033[1;37m")
+                            with open('SUCCESS.txt','a') as f:
+                                f.write(f"{user}:{password}\n")
+                        elif status == 'RETRY':
+                            print(f"{TF.RETRY}=> {user}:{password}\033[1;37m")
+                            with open('RETRY.txt','a') as f:
+                                f.write(f"{user}:{password}\n")
+                        elif status == 'CUSTOM':
+                            print(f"{TF.CUSTOM}=> {user}:{password}\033[1;37m")
+                            with open('CUSTOM.txt','a') as f:
+                                f.write(f"{user}:{password}\n")
+                        elif status == 'FAIL':
+                            print(f"{TF.FAIL}=> {user}:{password}\033[1;37m")
+                        elif status == 'BAN':
+                            print(f"{TF.BAN}=> {user}:{password}\033[1;37m")
+
+                        if completed % 10 == 0:
+                            elapsed = time.time() - start_time
+                            rate = completed / elapsed if elapsed > 0 else 0
+                            print(f"{k}[{completed}/{len(tasks)}] Speed: {rate:.1f}/s{k}")
+                            
+                except Exception as e:
+                    print(f"{TF.ERROR}Task failed: {e}")
+        
+        elapsed = time.time() - start_time
+        print(f"{lgn}Parallel processing completed in {elapsed:.1f}s{k}")
+        self.print_stats()
+        
+        return results
+
+def init_output_files():
+
+    output_files = ['SUCCESS.txt', 'RETRY.txt', 'CUSTOM.txt', 'ERROR_LOG.txt']
+    
+    for file in output_files:
+        if not os.path.exists(file):
+            with open(file, 'w') as f:
+                f.write(f"# OpenBullet Pro Results - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            print(f"{lgn}Created output file: {file}{k}")
+
 
 lock = f"""{k}                                                                                                                       
-                    
-                    
-  :++++++++++++++-  
-  =@@@@@@@@@@@@@@#  
-  :#@@@@@@@@@@@@%+  
-   .@@@@@@@@@@@@+   
-  :@@@@@@@@@@@@@@*  
-  -@@@@@@@@@@. %@@  
-  -@@@@@@@@@@: @@@  
-  -@@@@@@@@@@- @@@  
-  -@@@@@@@@@@- @@@  
-  -@@@@@@@@@@= @@@  
-  -@@@@@@@@@@+ @@@  
-  -@@@@@@@@@@*.@@@  {gn}OpenBullet Pro V1.2{k}
-  -@@@@@@@@@@*.@@@  
-  -@@@@@@@@@@#.@@@  {gn}Accept config: loli,anom,etc{k}
-  -@@@@@@@@@@%:@@@  
-  -@@@@@@@@@@@:@@@  {gn}save user:pass in mod {cn}RETRY,{yw}CUSTOM,{lgn}SUCCESS{k}
-  -@@@@@@@@@@@:@@@  
-  -@@@@@@@@@@@=@@@  
-  -@@@@@@@@@@@+@@@  
-  -@@@@@@@@@@@*@@@  
-  -@@@@@@@@@@@#@@@  {gn}Telegram: @MrEsfelurm{k}
-  -@@@@@@@@@@@%@@@  
-  -@@@@@@@@@@@@@@@  
-  -@@@@@@@@@@@@@@@  
-  -@@@@@@@@@@@@@@#  
-   *@@@@@@@@@@@@@.  
-    #@@@@@@@@@@@:   
-    *@@@@@@@@@@@   {gn} Update in: github.com/Mr-Spect3r{k}
-    *@@@@@@@@@@@    
-    *@@@@@@@@@@@    
-    +%%%%%%%%%%#    
-
-{yw}    *@@@@@@@%%@@    
-    =@@@@@@@:-@%    
-    .@@@@@@@.=@+    
-     %@@@@@@.+@-    
-     =@@@@@@ %@     
-      @@@@@%.@+     
-      *@@@@*+@.     
-      :@@@@+@*      
-       #@@@%@.      
-       .@@@@=       
-        =@@#        
-         *%.        
+                                                           
+    ..                                               ..    
+    -.-#==:                                     .==#=.:.   
+    -:   :#++.                               .+=#-   .+    
+     +-    .**+.                           .++#:    :+     
+      *+.  .: #**:                       .**#..:   +#.     
+       =#+   =:-#+#.                   .#*#=.+   =%+       
+        .+#= :++:-#+*.               .+**+:++- -#*.        
+          .##%: .* +#*#-           :*##*.*: .%%#.          
+            -#%#: .+-*#*+##:   .##*+#*==: .*%#=            
+              =%%*:+.+:.=##+#.**##=..+:=-+%%+              
+                +%%.  .=#.+%#*%%* *=.  .#%*                
+                 #%#.-*. ==.+#++*+ .+=.*%%.                
+                 :##%-.    +-.##=** ::###-                 
+                   +#%#.-   .*:.##-##%%*                   
+                    -%%%#:-   .*::##=#=                    
+                   #+*%%%%*.-   :#.:%#=#:                  
+                .#*+%+.%%%%%+-:   -*.-#*+#:                
+              .**=%+.++ #%%%%%=-:   -*.=#++#.              
+             *#=## +*    #%%##%%-=.   =*.*%+##.            
+           =#=##:=*.   =:#%%+ =#%#-=.   ++.*#=#+.          
+         =#+#%:=*.   -:#%%*     =#%#:=   .*+.##=#+         
+       :#*##--#:   ::*%%#.        *#%*:-   .#=:##*%=       
+      :###=-#-   .:+%%#.           .*%%*::   :#=-##*-      
+    *##%#-#=   .:=#%#:               .#%%+:.   :#-#####    
+    =#:+:#+.  :-%%#-                   :#%%=:.  =#-+:#*    
+     -%*=#+#*:#%#=                       :#%#:+#=#=+#=     
+       *%*:####=                           :####-+%#.      
+         =##%=                               :%##+.        
+                                                                  
                     
 """
 bullet = f"""{k}
@@ -3050,7 +3136,7 @@ bullet = f"""{k}
 |     |l     ||     ||     ||     T  |  |  
 l_____j \__,_jl_____jl_____jl_____j  l__j  
 
-	{gn}Telegram: @MrEsfelurm\n\n
+	{gn}Telegram: @Specter_OG\n\n
 """
 RUN = f"{pe} Config executed!"
 version = f"""
@@ -3059,62 +3145,277 @@ version = f"""
 {lrd}    Git & Telegram : @esfelorm     \n\n            
 """
 if __name__ == "__main__":
-    try:
-        from colorama import init
-    except:
-        os.system('pip install colorama')
-    init()
-    clear()
-    ToSleep(lock,0.0)
-    ToSleep(version,0.05)
-    config = input(f"{lrd}[{lgn}~{lrd}]{gn} Enter Address and Config Name: {cn}")
-    Type = input(f"{lrd}[{lgn}~{lrd}]{gn} Type Proxy {yw}[{k}ex: socks5,https,etc{yw}]: {cn}")
-    try:
-        config = ConfigToText(config)
-    except:
-        print (f'{TF.ERROR}! Check the file {k}{config}')
-        exit()
-    proxy = input(f'{lrd}[{lgn}~{lrd}]{gn} Address and Proxy Name {yw}[{k}ex: socks.txt{yw}]: {cn}')
-    try:
-        proxy = open(proxy,'r')
-    except:
-        print (f'{TF.ERROR}! Check the file {k}{proxy}')
-        exit()
-    user = input(f'{lrd}[{lgn}~{lrd}]{gn} Address and ComboList Name {yw}[{k}ex: warzone.anom{yw}]: {cn}')
-    try:
-        user = open(user,'r')
-    except:
-        print (f'{TF.ERROR}! Check the file {k}{user}')
-        exit()
+    import argparse
 
-    time.sleep(3)
-    clear()
-    ToSleep(bullet,0.0015)
-    ToSleep(RUN,0.010)
-    for PROXY in proxy:
-        for i in user:
-            UserPass = i.split(':')
-            UserPass = UserPass[0].strip(),UserPass[1].strip()
-            open_bullet = OpenBullet(config=config, USER=UserPass[0],PASS=UserPass[1],proxy=[PROXY,str(Type)])
-            print('\033[1;37m')
-            run = open_bullet.run()
-            if 'SUCCESS' == run:
-                print (f"{TF.SUCCESS}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
-                with open('SUCCESS.txt','a') as suc:
-                    suc.write(f"{UserPass[0]}:{UserPass[1]}\n")
-            elif 'BAN' == run:
-                print (f"{TF.BAN}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
-            elif 'FAIL' == run:
-                print (f"{TF.FAIL}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
-            elif 'NONE' == run:
-                print (f"{TF.NONE}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
-            elif 'ERROR' == run:
-                print (f"{TF.ERROR}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
-            elif 'RETRY' == run:
-                print (f"{TF.RETRY}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
-                with open('RETRY.txt','a') as ret:
-                    ret.write(str(f"{UserPass[0]}:{UserPass[1]}\n"))
-            elif 'CUSTOM' == run:
-                print (f"{TF.CUSTOM}=> {UserPass[0]}:{UserPass[1]}\033[1;37m")
-                with open('CUSTOM.txt','a') as cus:
-                    cus.write(f"{UserPass[0]}:{UserPass[1]}\n")
+    parser = argparse.ArgumentParser(
+        description='OpenBullet Pro - Config Runner',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s --config test.loli --combos combos.txt
+  %(prog)s --config config.anom --combos list.txt --proxy-type socks5 --proxies proxies.txt
+  %(prog)s --config test.loli --combos data.txt --no-proxy --parallel --workers 10
+        """
+    )
+    
+    parser.add_argument('--config', '-c', required=True, help='Path to config file (.loli, .anom, etc.)')
+    parser.add_argument('--combos', '-u', required=True, help='Path to combos file (user:pass format)')
+    
+    parser.add_argument('--proxies', '-p', help='Path to proxies file (optional)')
+    parser.add_argument('--proxy-type', '-t', default='http', 
+                       choices=['http', 'https', 'socks4', 'socks5'], 
+                       help='Proxy type (default: http)')
+    
+    parser.add_argument('--no-proxy', action='store_true', help='Run without proxies')
+    parser.add_argument('--parallel', '-P', action='store_true', help='Enable parallel processing')
+    parser.add_argument('--workers', '-w', type=int, default=5, 
+                       help='Number of workers for parallel mode (default: 5)')
+    parser.add_argument('--output', '-o', default='.', help='Output directory for results')
+    parser.add_argument('--silent', '-s', action='store_true', help='Silent mode (no banners)')
+    parser.add_argument('--delay', '-d', type=float, default=0, 
+                       help='Delay between requests in seconds')
+    
+    args = parser.parse_args()
+
+    if not os.path.exists(args.config):
+        print(f'{TF.ERROR}! Config file not found: {args.config}')
+        exit(1)
+    
+    if not os.path.exists(args.combos):
+        print(f'{TF.ERROR}! Combos file not found: {args.combos}')
+        exit(1)
+    
+    if args.proxies and not os.path.exists(args.proxies):
+        print(f'{TF.ERROR}! Proxies file not found: {args.proxies}')
+        exit(1)
+    
+    if not args.silent:
+        clear()
+        ToSleep(lock, 0.0)
+        ToSleep(version, 0.05)
+    
+    print(f"{lgn}Loading files...{k}")
+    
+    try:
+        config_text = ConfigToText(args.config)
+        if not config_text:
+            print(f'{TF.ERROR}! Empty or invalid config file')
+            exit(1)
+    except Exception as e:
+        print(f'{TF.ERROR}! Error reading config: {e}')
+        exit(1)
+    
+    try:
+        with open(args.combos, 'r', encoding='utf-8', errors='ignore') as f:
+            combo_list = [line.strip() for line in f if line.strip()]
+        print(f"{lgn}✓ Loaded {len(combo_list)} combos{k}")
+    except Exception as e:
+        print(f'{TF.ERROR}! Error reading combos: {e}')
+        exit(1)
+    
+    proxy_list = []
+    proxy_type = args.proxy_type
+    
+    if args.no_proxy:
+        print(f"{yw}Running without proxies{k}")
+        proxy_list = [None] 
+        proxy_type = None
+    elif args.proxies:
+        try:
+            with open(args.proxies, 'r', encoding='utf-8', errors='ignore') as f:
+                proxy_list = [line.strip() for line in f if line.strip()]
+            print(f"{lgn}✓ Loaded {len(proxy_list)} proxies ({proxy_type}){k}")
+        except Exception as e:
+            print(f'{TF.ERROR}! Error reading proxies: {e}')
+            exit(1)
+    else:
+        print(f"{yw}No proxies file specified, running without proxies{k}")
+        proxy_list = [None]
+        proxy_type = None
+    
+    if len(combo_list) == 0:
+        print(f'{TF.ERROR}! No combos loaded')
+        exit(1)
+    
+    if not args.no_proxy and args.proxies and len(proxy_list) == 0:
+        print(f'{TF.ERROR}! No proxies loaded')
+        exit(1)
+
+    if not args.silent:
+        time.sleep(1)
+        clear()
+        ToSleep(bullet, 0.0015)
+        ToSleep(RUN, 0.01)
+        print(f"\n{gn}{'='*50}")
+        print(f"📋 Execution Summary")
+        print(f"{'='*50}{k}")
+        print(f"📁 Config: {args.config}")
+        print(f"👥 Combos: {len(combo_list)}")
+        print(f"🛡️ Proxies: {len(proxy_list) if proxy_list and proxy_list[0] else 'None'}")
+        print(f"⚡ Mode: {'Parallel' if args.parallel else 'Sequential'}")
+        if args.parallel:
+            print(f"👷 Workers: {args.workers}")
+        print(f"📊 Output: {args.output}")
+        print(f"{gn}{'='*50}\n")
+        
+    warnings.filterwarnings('ignore')
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    os.makedirs(args.output, exist_ok=True)
+    
+    if args.parallel:
+        print(f"{lgn}Starting parallel processing with {args.workers} workers...{k}")
+        
+        processor = ParallelProcessor(
+            config_text=config_text,
+            proxy_list=proxy_list if proxy_list[0] else [None],
+            combo_list=combo_list,
+            proxy_type=proxy_type,
+            max_workers=args.workers
+        )
+        
+        processor.run_parallel()
+        
+    else:
+        print(f"{lgn}Starting sequential processing...{k}")
+        
+        start_time = time.time()
+        processed = 0
+        total_combinations = len(proxy_list) * len(combo_list)
+
+        stats = {
+            'success': 0,
+            'retry': 0,
+            'custom': 0,
+            'fail': 0,
+            'ban': 0,
+            'none': 0,
+            'error': 0,
+            'invalid': 0
+        }
+        
+        for proxy in proxy_list:
+            for combo in combo_list:
+                processed += 1
+                
+                UserPass = combo.split(':', 1)  
+                if len(UserPass) < 2:
+                    print(f"{TF.ERROR}Invalid combo format: {combo}")
+                    stats['invalid'] += 1
+                    continue
+                requests.cookies.RequestsCookieJar.set_cookie = lambda self, cookie, *args, **kwargs: None
+                username = UserPass[0].strip()
+                password = UserPass[1].strip()
+                
+                try:
+                    open_bullet = OpenBullet(
+                        config=config_text, 
+                        USER=username,
+                        PASS=password,
+                        proxy=proxy if proxy else None,
+                        proxy_type=proxy_type if proxy else None,
+                        output_path=args.output
+                    )
+                    
+                    status = open_bullet.run()
+
+                    if status == 'SUCCESS':
+                        stats['success'] += 1
+                        print(f"{TF.SUCCESS}=> {username}:{password}\033[1;37m")
+                        with open(os.path.join(args.output, 'SUCCESS.txt'), 'a', encoding='utf-8') as f:
+                            f.write(f"{username}:{password}\n")
+                    elif status == 'RETRY':
+                        stats['retry'] += 1
+                        print(f"{TF.RETRY}=> {username}:{password}\033[1;37m")
+                        with open(os.path.join(args.output, 'RETRY.txt'), 'a', encoding='utf-8') as f:
+                            f.write(f"{username}:{password}\n")
+                    elif status == 'CUSTOM':
+                        stats['custom'] += 1
+                        print(f"{TF.CUSTOM}=> {username}:{password}\033[1;37m")
+                        with open(os.path.join(args.output, 'CUSTOM.txt'), 'a', encoding='utf-8') as f:
+                            f.write(f"{username}:{password}\n")
+                    elif status == 'FAIL':
+                        stats['fail'] += 1
+                        print(f"{TF.FAIL}=> {username}:{password}\033[1;37m")
+                        with open(os.path.join(args.output, 'FAIL.txt'), 'a', encoding='utf-8') as f:
+                            f.write(f"{username}:{password}\n")
+                    elif status == 'BAN':
+                        stats['ban'] += 1
+                        print(f"{TF.BAN}=> {username}:{password}\033[1;37m")
+                        with open(os.path.join(args.output, 'BAN.txt'), 'a', encoding='utf-8') as f:
+                            f.write(f"{username}:{password}\n")
+                    elif status == 'NONE':
+                        stats['none'] += 1
+                        print(f"{TF.NONE}=> {username}:{password}\033[1;37m")
+                    elif status == 'ERROR':
+                        stats['error'] += 1
+                        print(f"{TF.ERROR}=> {username}:{password}\033[1;37m")
+                        with open(os.path.join(args.output, 'ERROR.txt'), 'a', encoding='utf-8') as f:
+                            f.write(f"{username}:{password} | Error\n")
+
+                    if args.delay > 0:
+                        time.sleep(args.delay)
+
+                    if processed % 10 == 0:
+                        elapsed = time.time() - start_time
+                        rate = processed / elapsed if elapsed > 0 else 0
+                        remaining = total_combinations - processed
+                        eta = remaining / rate if rate > 0 else 0
+                        
+                        print(f"{k}[{processed}/{total_combinations}] "
+                              f"Speed: {rate:.1f}/s | "
+                              f"ETA: {eta//3600:.0f}h {(eta%3600)//60:.0f}m{k}")
+                        
+                except Exception as e:
+                    stats['error'] += 1
+                    print(f"{TF.ERROR}Error processing {username}: {e}")
+                    with open(os.path.join(args.output, 'ERROR_LOG.txt'), 'a', encoding='utf-8') as f:
+                        f.write(f"{username}:{password} | {e}\n")
+        
+        elapsed = time.time() - start_time
+        total_valid = processed - stats['invalid']
+
+        print(f"\n{yw}{'='*60}")
+        print(f"📊 {gn}FINAL STATISTICS")
+        print(f"{yw}{'='*60}{k}")
+
+        print(f"⏱️ Time: {elapsed:.1f}s")
+        print(f"📈 Total Checks: {processed}")
+        print(f"⚡ Average Speed: {processed/elapsed:.1f} checks/s" if elapsed > 0 else "⚡ Average Speed: 0.0 checks/s")
+        print('-'*60)
+
+        print(f"{gn}✅ SUCCESS: {stats['success']} ({stats['success']/total_valid*100:.1f}%)")
+        print(f"{be}🔄 RETRY: {stats['retry']} ({stats['retry']/total_valid*100:.1f}%)")
+        print(f"{cn}🎨 CUSTOM: {stats['custom']} ({stats['custom']/total_valid*100:.1f}%)")
+        print(f"{rd}❌ FAIL: {stats['fail']} ({stats['fail']/total_valid*100:.1f}%)")
+        print(f"{lrd}🚫 BAN: {stats['ban']} ({stats['ban']/total_valid*100:.1f}%)")
+        print(f"{k}⚪ NONE: {stats['none']} ({stats['none']/total_valid*100:.1f}%)")
+        print(f"{lrd}💥 ERROR: {stats['error']} ({stats['error']/total_valid*100:.1f}%)")
+        print(f"{g}⚠️ INVALID: {stats['invalid']}{k}")
+
+        print(f"{'-'*60}")
+        print(f"📁 Output Directory: {os.path.abspath(args.output)}")
+
+        output_files = {
+            'SUCCESS.txt': stats['success'],
+            'RETRY.txt': stats['retry'],
+            'CUSTOM.txt': stats['custom'],
+            'FAIL.txt': stats['fail'],
+            'BAN.txt': stats['ban'],
+            'ERROR.txt': stats['error']
+        }
+        
+        for filename, count in output_files.items():
+            filepath = os.path.join(args.output, filename)
+            if os.path.exists(filepath) and count > 0:
+                file_size = os.path.getsize(filepath)
+                print(f"📄 {filename}: {count} results ({file_size/1024:.1f} KB)")
+        
+        print(f"{gn}{'='*60}{k}")
+
+        print(f"\n{yw}💡 For next run:{k}")
+        if stats['retry'] > 0:
+            print(f"  - Run RETRY.txt with: python openbullet.py --config {args.config} --combos {os.path.join(args.output, 'RETRY.txt')}")
+        if stats['ban'] > stats['success'] * 0.5:  
+            print(f"  - Consider using better proxies or reducing workers")
+        
+        print(f"\n{gn}✅ Processing completed!{k}")
